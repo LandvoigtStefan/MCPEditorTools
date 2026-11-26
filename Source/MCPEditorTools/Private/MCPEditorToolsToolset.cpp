@@ -7,6 +7,9 @@
 #include "K2Node_FunctionResult.h"
 #include "K2Node_Event.h"
 #include "AssetRegistry/AssetRegistryModule.h"
+#include "PackageTools.h"
+#include "Misc/PackageName.h"
+#include "UObject/Package.h"
 #include "Modules/ModuleManager.h"
 
 FString UMCPEditorToolsToolset::Ping()
@@ -32,6 +35,40 @@ FString UMCPEditorToolsToolset::GetEventReplication(const FString& BlueprintPath
 	UK2Node_CustomEvent* Ev = MCPToolUtils::FindCustomEvent(BP, EventName);
 	if (!Ev) { return MCPToolUtils::Error(FString::Printf(TEXT("custom event '%s' not found in %s"), *EventName, *BlueprintPath)); }
 	return DescribeReplication(Ev->FunctionFlags);
+}
+
+FString UMCPEditorToolsToolset::ReloadOrDiscardAsset(const TArray<FString>& AssetPaths, bool bDryRun)
+{
+	TArray<FString> Lines;
+	TArray<UPackage*> ToReload;
+	int32 DirtyCount = 0;
+	for (const FString& Path : AssetPaths)
+	{
+		UPackage* Package = FindPackage(nullptr, *Path);
+		if (!Package) { Lines.Add(Path + TEXT(" | not loaded, skipped")); continue; }
+		if (!Package->IsDirty()) { Lines.Add(Path + TEXT(" | clean, skipped")); continue; }
+		if (!FPackageName::DoesPackageExist(Path)) { Lines.Add(Path + TEXT(" | dirty but NOT on disk (new asset), skipped")); continue; }
+		++DirtyCount;
+		ToReload.Add(Package);
+		Lines.Add(Path + (bDryRun ? TEXT(" | dirty, would reload") : TEXT(" | dirty, reloading")));
+	}
+
+	int32 Reloaded = 0;
+	if (!bDryRun && ToReload.Num() > 0)
+	{
+		FText ErrorMessage;
+		const bool bOk = UPackageTools::ReloadPackages(ToReload, ErrorMessage, EReloadPackagesInteractionMode::AssumePositive);
+		if (!bOk) { Lines.Add(TEXT("reload reported a problem: ") + ErrorMessage.ToString()); }
+		for (const FString& Path : AssetPaths)
+		{
+			UPackage* Package = FindPackage(nullptr, *Path);
+			// After a reload the old package may be replaced; the asset counts as reloaded when it is loaded again and clean.
+			if (!Package) { Package = LoadPackage(nullptr, *Path, LOAD_None); }
+			if (Package && !Package->IsDirty() && ToReload.ContainsByPredicate([&](UPackage* P) { return P && P->GetName() == Path; })) { ++Reloaded; }
+			else if (Package && Package->IsDirty()) { Lines.Add(Path + TEXT(" | STILL DIRTY after reload")); }
+		}
+	}
+	return FString::Printf(TEXT("dry_run=%s dirty=%d reloaded=%d\n%s"), bDryRun ? TEXT("true") : TEXT("false"), DirtyCount, Reloaded, *FString::Join(Lines, TEXT("\n")));
 }
 
 FString UMCPEditorToolsToolset::ListCustomEvents(const FString& Path)

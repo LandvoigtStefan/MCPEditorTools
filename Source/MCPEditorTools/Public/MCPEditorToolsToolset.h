@@ -25,6 +25,17 @@ public:
 	static FString GetEventReplication(const FString& BlueprintPath, const FString& EventName);
 
 	/**
+	 * Discards unsaved in-memory changes of loaded assets by reloading them from disk (replaces "save, close editor, git restore").
+	 * DESTROYS unsaved work in those assets: use only for assets you did not really edit (e.g. dirty just from reading) or want to throw away.
+	 * Assets that are clean, not loaded, or not on disk are skipped and reported.
+	 * @param AssetPaths Package paths, e.g. /Game/Folder/BP_Name
+	 * @param bDryRun true = only report which assets are dirty and would be reloaded (use first); false = reload the dirty ones
+	 * @return One line per asset ("<path> | dirty | reloaded" etc.), first line "dry_run=<bool> dirty=<n> reloaded=<n>"; or "ERROR: ..."
+	 */
+	UFUNCTION(meta = (AICallable))
+	static FString ReloadOrDiscardAsset(const TArray<FString>& AssetPaths, bool bDryRun);
+
+	/**
 	 * Lists all custom events with their replication setting. Read-only.
 	 * @param Path A Blueprint asset path, or a folder (e.g. /Game/DoN) to scan all Blueprints below it
 	 * @return One line per event: "<BlueprintPath> | <EventName> | mode=... reliable=..." (plus a first line with the count), or "ERROR: ..."

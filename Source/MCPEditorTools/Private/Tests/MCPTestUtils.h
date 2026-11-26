@@ -7,6 +7,9 @@
 #include "Kismet2/KismetEditorUtilities.h"
 #include "K2Node_CustomEvent.h"
 #include "UObject/Package.h"
+#include "UObject/SavePackage.h"
+#include "Misc/PackageName.h"
+#include "HAL/FileManager.h"
 
 /** Helpers for the automation tests: temporary in-memory assets (never saved to disk) under /Game/DoN/Tests/Temp/. */
 namespace MCPTestUtils
@@ -33,6 +36,21 @@ namespace MCPTestUtils
 		Node->PostPlacedNewNode();
 		Node->AllocateDefaultPins();
 		return Node;
+	}
+
+	/** Saves the temp Blueprint to disk under /Game/DoN/Tests/Temp/ (needed for reload tests). Returns the file name. Delete it with DeleteTempFile. */
+	inline FString SaveTempToDisk(UBlueprint* BP)
+	{
+		const FString File = FPackageName::LongPackageNameToFilename(PathOf(BP), FPackageName::GetAssetPackageExtension());
+		FSavePackageArgs Args;
+		Args.TopLevelFlags = RF_Public | RF_Standalone;
+		UPackage::SavePackage(BP->GetPackage(), BP, *File, Args);
+		return File;
+	}
+
+	inline void DeleteTempFile(const FString& File)
+	{
+		if (File.Contains(TEXT("DoN/Tests/Temp"))) { IFileManager::Get().Delete(*File); } // safety: only ever delete inside the temp folder
 	}
 
 	inline void Cleanup(UBlueprint* BP)
