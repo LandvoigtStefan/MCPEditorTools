@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Engine/Blueprint.h"
@@ -50,6 +50,7 @@ namespace MCPTestUtils
 
 	inline void DeleteTempFile(const FString& File)
 	{
+		CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS); // unload the package first, otherwise the file stays locked
 		if (File.Contains(TEXT("DoN/Tests/Temp"))) { IFileManager::Get().Delete(*File); } // safety: only ever delete inside the temp folder
 	}
 
@@ -62,3 +63,4 @@ namespace MCPTestUtils
 		if (Package) { Package->MarkAsGarbage(); }
 	}
 }
+

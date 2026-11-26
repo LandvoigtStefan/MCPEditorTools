@@ -1,4 +1,4 @@
-#include "MCPEditorToolsToolset.h"
+﻿#include "MCPEditorToolsToolset.h"
 #include "MCPToolUtils.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"
@@ -42,6 +42,7 @@ FString UMCPEditorToolsToolset::ReloadOrDiscardAsset(const TArray<FString>& Asse
 	TArray<FString> Lines;
 	TArray<UPackage*> ToReload;
 	int32 DirtyCount = 0;
+	TArray<FString> DirtyPaths;
 	for (const FString& Path : AssetPaths)
 	{
 		UPackage* Package = FindPackage(nullptr, *Path);
@@ -49,6 +50,7 @@ FString UMCPEditorToolsToolset::ReloadOrDiscardAsset(const TArray<FString>& Asse
 		if (!Package->IsDirty()) { Lines.Add(Path + TEXT(" | clean, skipped")); continue; }
 		if (!FPackageName::DoesPackageExist(Path)) { Lines.Add(Path + TEXT(" | dirty but NOT on disk (new asset), skipped")); continue; }
 		++DirtyCount;
+		DirtyPaths.Add(Path);
 		ToReload.Add(Package);
 		Lines.Add(Path + (bDryRun ? TEXT(" | dirty, would reload") : TEXT(" | dirty, reloading")));
 	}
@@ -64,7 +66,7 @@ FString UMCPEditorToolsToolset::ReloadOrDiscardAsset(const TArray<FString>& Asse
 			UPackage* Package = FindPackage(nullptr, *Path);
 			// After a reload the old package may be replaced; the asset counts as reloaded when it is loaded again and clean.
 			if (!Package) { Package = LoadPackage(nullptr, *Path, LOAD_None); }
-			if (Package && !Package->IsDirty() && ToReload.ContainsByPredicate([&](UPackage* P) { return P && P->GetName() == Path; })) { ++Reloaded; }
+			if (Package && !Package->IsDirty() && DirtyPaths.Contains(Path)) { ++Reloaded; }
 			else if (Package && Package->IsDirty()) { Lines.Add(Path + TEXT(" | STILL DIRTY after reload")); }
 		}
 	}
@@ -247,3 +249,4 @@ FString UMCPEditorToolsToolset::SetEventReplication(const FString& BlueprintPath
 	FKismetEditorUtilities::CompileBlueprint(BP);
 	return FString::Printf(TEXT("OK %s (asset not saved)"), *DescribeReplication(Ev->FunctionFlags));
 }
+
