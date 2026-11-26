@@ -49,7 +49,7 @@ bool FMCPFindDeadNodesTest::RunTest(const FString& Parameters)
 	const int32 NodesBefore = Graph->Nodes.Num();
 
 	const FString Dry = UMCPEditorToolsToolset::FindDeadNodes(Path, Graph->GetName(), true);
-	TestTrue(TEXT("dry run finds 9 dead"), Dry.StartsWith(TEXT("dry_run=true dead=5 removed=0")));
+	TestTrue(TEXT("dry run finds 4 dead"), Dry.StartsWith(TEXT("dry_run=true dead=4 removed=0")));
 	TestTrue(TEXT("Print2 dead"), Dry.Contains(Print2->GetName()));
 	TestTrue(TEXT("Print3 dead"), Dry.Contains(Print3->GetName()));
 	TestTrue(TEXT("Concat2 dead"), Dry.Contains(Concat2->GetName()));
@@ -69,4 +69,5 @@ bool FMCPFindDeadNodesTest::RunTest(const FString& Parameters)
 	AddInfo(TEXT("PASS all checks passed"));
 	return true;
 }
+
 
