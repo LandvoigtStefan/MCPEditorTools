@@ -35,7 +35,7 @@ bool FMCPFindUnconnectedNodesTest::RunTest(const FString& Parameters)
 	const int32 NodesBefore = Graph->Nodes.Num();
 
 	const FString Dry = UMCPEditorToolsToolset::FindUnconnectedNodes(Path, Graph->GetName(), true);
-	TestTrue(TEXT("dry run reports 1 candidate"), Dry.StartsWith(TEXT("dry_run=true candidates=2 removed=0")));
+	TestTrue(TEXT("dry run reports 1 candidate"), Dry.StartsWith(TEXT("dry_run=true candidates=1 removed=0")));
 	TestTrue(TEXT("dry run lists the loose node"), Dry.Contains(Loose->GetName()));
 	TestFalse(TEXT("dry run does not list the connected node"), Dry.Contains(Connected->GetName()));
 	TestTrue(TEXT("dry run lists the lonely event as kept"), Dry.Contains(TEXT("[event, kept]")));
@@ -53,4 +53,5 @@ bool FMCPFindUnconnectedNodesTest::RunTest(const FString& Parameters)
 	AddInfo(TEXT("PASS all checks passed"));
 	return true;
 }
+
 
