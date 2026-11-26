@@ -25,6 +25,14 @@ public:
 	static FString GetEventReplication(const FString& BlueprintPath, const FString& EventName);
 
 	/**
+	 * Lists all custom events with their replication setting. Read-only.
+	 * @param Path A Blueprint asset path, or a folder (e.g. /Game/DoN) to scan all Blueprints below it
+	 * @return One line per event: "<BlueprintPath> | <EventName> | mode=... reliable=..." (plus a first line with the count), or "ERROR: ..."
+	 */
+	UFUNCTION(meta = (AICallable))
+	static FString ListCustomEvents(const FString& Path);
+
+	/**
 	 * Sets the replication of a custom event. Does NOT save the asset (it stays dirty in memory).
 	 * @param BlueprintPath Asset path, e.g. /Game/Folder/BP_Name
 	 * @param EventName Name of the custom event

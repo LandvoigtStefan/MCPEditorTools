@@ -6,6 +6,8 @@
 #include "K2Node_FunctionEntry.h"
 #include "K2Node_FunctionResult.h"
 #include "K2Node_Event.h"
+#include "AssetRegistry/AssetRegistryModule.h"
+#include "Modules/ModuleManager.h"
 
 FString UMCPEditorToolsToolset::Ping()
 {
@@ -30,6 +32,44 @@ FString UMCPEditorToolsToolset::GetEventReplication(const FString& BlueprintPath
 	UK2Node_CustomEvent* Ev = MCPToolUtils::FindCustomEvent(BP, EventName);
 	if (!Ev) { return MCPToolUtils::Error(FString::Printf(TEXT("custom event '%s' not found in %s"), *EventName, *BlueprintPath)); }
 	return DescribeReplication(Ev->FunctionFlags);
+}
+
+FString UMCPEditorToolsToolset::ListCustomEvents(const FString& Path)
+{
+	TArray<FString> BlueprintPaths;
+	FAssetRegistryModule& ARM = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+	TArray<FAssetData> Assets;
+	ARM.Get().GetAssetsByPath(FName(*Path), Assets, true);
+	for (const FAssetData& A : Assets)
+	{
+		if (A.IsInstanceOf(UBlueprint::StaticClass())) { BlueprintPaths.Add(A.PackageName.ToString()); }
+	}
+	if (BlueprintPaths.Num() == 0) { BlueprintPaths.Add(Path); }
+
+	TArray<FString> Lines;
+	for (const FString& BPPath : BlueprintPaths)
+	{
+		FString Err;
+		UBlueprint* BP = MCPToolUtils::LoadBlueprint(BPPath, Err);
+		if (!BP)
+		{
+			if (BlueprintPaths.Num() == 1) { return Err; }
+			continue;
+		}
+		TArray<UEdGraph*> Graphs;
+		BP->GetAllGraphs(Graphs);
+		for (UEdGraph* Graph : Graphs)
+		{
+			for (UEdGraphNode* Node : Graph->Nodes)
+			{
+				if (UK2Node_CustomEvent* Ev = Cast<UK2Node_CustomEvent>(Node))
+				{
+					Lines.Add(FString::Printf(TEXT("%s | %s | %s"), *BPPath, *Ev->CustomFunctionName.ToString(), *DescribeReplication(Ev->FunctionFlags)));
+				}
+			}
+		}
+	}
+	return FString::Printf(TEXT("blueprints=%d events=%d\n%s"), BlueprintPaths.Num(), Lines.Num(), *FString::Join(Lines, TEXT("\n")));
 }
 
 FString UMCPEditorToolsToolset::FindUnconnectedNodes(const FString& BlueprintPath, const FString& GraphName, bool bDryRun)
