@@ -30,7 +30,7 @@ bool FMCPReloadOrDiscardAssetTest::RunTest(const FString& Parameters)
 	UBlueprint* Reloaded = MCPToolUtils::LoadBlueprint(Path, Err);
 	if (TestNotNull(TEXT("blueprint loadable after reload"), Reloaded))
 	{
-		TestTrue(TEXT("unsaved event is gone after reload"), MCPToolUtils::FindCustomEvent(Reloaded, TEXT("UnsavedEvent")) != nullptr);
+		TestTrue(TEXT("unsaved event is gone after reload"), MCPToolUtils::FindCustomEvent(Reloaded, TEXT("UnsavedEvent")) == nullptr);
 		TestFalse(TEXT("clean after reload"), Reloaded->GetPackage()->IsDirty());
 	}
 
@@ -43,4 +43,5 @@ bool FMCPReloadOrDiscardAssetTest::RunTest(const FString& Parameters)
 	AddInfo(TEXT("PASS all checks passed"));
 	return true;
 }
+
 
