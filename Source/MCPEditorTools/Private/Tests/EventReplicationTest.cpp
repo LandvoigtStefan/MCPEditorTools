@@ -32,5 +32,6 @@ bool FMCPEventReplicationTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("unknown blueprint is an error"), UMCPEditorToolsToolset::GetEventReplication(TEXT("/Game/DoN/Tests/Temp/DoesNotExist"), TEXT("X")).StartsWith(TEXT("ERROR")));
 
 	MCPTestUtils::Cleanup(BP);
+	AddInfo(TEXT("PASS all checks passed")); // the headless runner needs a PASS line, otherwise it counts as "no checks ran"
 	return true;
 }
