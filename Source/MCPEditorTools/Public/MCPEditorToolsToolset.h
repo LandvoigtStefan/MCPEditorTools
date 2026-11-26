@@ -102,4 +102,16 @@ public:
 	 */
 	UFUNCTION(meta = (AICallable))
 	static FString SetFunctionPure(const FString& BlueprintPath, const FString& FunctionName, bool bPure);
+
+	/**
+	 * Adds an INPUT parameter to a custom event (so a Server RPC can carry data). Epic's add_function_param only works on function graphs,
+	 * the DSL cannot create typed event parameters. Recompiles; does NOT save the asset. Existing callers of the event get the new pin on their next reconstruct.
+	 * @param BlueprintPath Asset path, e.g. /Game/Folder/BP_Name
+	 * @param EventName Name of the custom event
+	 * @param ParamName Name of the new parameter (must not exist yet)
+	 * @param TypeName bool, int, float, byte, string, name, text, Vector, Rotator, or an object class path (e.g. /Script/Engine.Actor, /Script/Engine.PrimitiveComponent)
+	 * @return "OK added <name> (<type>); event now has <n> parameters (asset not saved)" or "ERROR: ..."
+	 */
+	UFUNCTION(meta = (AICallable))
+	static FString AddEventParameter(const FString& BlueprintPath, const FString& EventName, const FString& ParamName, const FString& TypeName);
 };

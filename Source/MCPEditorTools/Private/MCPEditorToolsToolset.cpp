@@ -6,6 +6,8 @@
 #include "K2Node_FunctionEntry.h"
 #include "K2Node_FunctionResult.h"
 #include "K2Node_Event.h"
+#include "K2Node_CustomEvent.h"
+#include "EdGraphSchema_K2.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "PackageTools.h"
 #include "Misc/PackageName.h"
@@ -248,6 +250,45 @@ FString UMCPEditorToolsToolset::SetEventReplication(const FString& BlueprintPath
 	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);
 	FKismetEditorUtilities::CompileBlueprint(BP);
 	return FString::Printf(TEXT("OK %s (asset not saved)"), *DescribeReplication(Ev->FunctionFlags));
+}
+
+FString UMCPEditorToolsToolset::AddEventParameter(const FString& BlueprintPath, const FString& EventName, const FString& ParamName, const FString& TypeName)
+{
+	if (ParamName.IsEmpty()) { return MCPToolUtils::Error(TEXT("ParamName is empty")); }
+	FEdGraphPinType PinType;
+	if (TypeName.Equals(TEXT("bool"), ESearchCase::IgnoreCase)) { PinType.PinCategory = UEdGraphSchema_K2::PC_Boolean; }
+	else if (TypeName.Equals(TEXT("int"), ESearchCase::IgnoreCase)) { PinType.PinCategory = UEdGraphSchema_K2::PC_Int; }
+	else if (TypeName.Equals(TEXT("float"), ESearchCase::IgnoreCase)) { PinType.PinCategory = UEdGraphSchema_K2::PC_Real; PinType.PinSubCategory = UEdGraphSchema_K2::PC_Double; }
+	else if (TypeName.Equals(TEXT("byte"), ESearchCase::IgnoreCase)) { PinType.PinCategory = UEdGraphSchema_K2::PC_Byte; }
+	else if (TypeName.Equals(TEXT("string"), ESearchCase::IgnoreCase)) { PinType.PinCategory = UEdGraphSchema_K2::PC_String; }
+	else if (TypeName.Equals(TEXT("name"), ESearchCase::IgnoreCase)) { PinType.PinCategory = UEdGraphSchema_K2::PC_Name; }
+	else if (TypeName.Equals(TEXT("text"), ESearchCase::IgnoreCase)) { PinType.PinCategory = UEdGraphSchema_K2::PC_Text; }
+	else if (TypeName.Equals(TEXT("Vector"), ESearchCase::IgnoreCase)) { PinType.PinCategory = UEdGraphSchema_K2::PC_Struct; PinType.PinSubCategoryObject = TBaseStructure<FVector>::Get(); }
+	else if (TypeName.Equals(TEXT("Rotator"), ESearchCase::IgnoreCase)) { PinType.PinCategory = UEdGraphSchema_K2::PC_Struct; PinType.PinSubCategoryObject = TBaseStructure<FRotator>::Get(); }
+	else if (TypeName.StartsWith(TEXT("/")))
+	{
+		UClass* Class = LoadObject<UClass>(nullptr, *TypeName);
+		if (!Class) { return MCPToolUtils::Error(FString::Printf(TEXT("class '%s' not found"), *TypeName)); }
+		PinType.PinCategory = UEdGraphSchema_K2::PC_Object;
+		PinType.PinSubCategoryObject = Class;
+	}
+	else
+	{
+		return MCPToolUtils::Error(FString::Printf(TEXT("unknown type '%s' (use bool, int, float, byte, string, name, text, Vector, Rotator or a class path)"), *TypeName));
+	}
+
+	FString Err;
+	UBlueprint* BP = MCPToolUtils::LoadBlueprint(BlueprintPath, Err);
+	if (!BP) { return Err; }
+	UK2Node_CustomEvent* Ev = MCPToolUtils::FindCustomEvent(BP, EventName);
+	if (!Ev) { return MCPToolUtils::Error(FString::Printf(TEXT("custom event '%s' not found in %s"), *EventName, *BlueprintPath)); }
+	if (Ev->UserDefinedPinExists(FName(*ParamName))) { return MCPToolUtils::Error(FString::Printf(TEXT("event '%s' already has a parameter '%s'"), *EventName, *ParamName)); }
+
+	Ev->Modify();
+	Ev->CreateUserDefinedPin(FName(*ParamName), PinType, EGPD_Output, false);
+	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);
+	FKismetEditorUtilities::CompileBlueprint(BP);
+	return FString::Printf(TEXT("OK added %s (%s); event now has %d parameters (asset not saved)"), *ParamName, *TypeName, Ev->UserDefinedPins.Num());
 }
 
 static UEdGraphNode* FindNodeByName(UEdGraph* Graph, const FString& NodeName)
