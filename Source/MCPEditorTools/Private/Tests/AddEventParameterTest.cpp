@@ -18,7 +18,7 @@ bool FMCPAddEventParameterTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("add vector"), UMCPEditorToolsToolset::AddEventParameter(Path, TEXT("TestEvent"), TEXT("Origin"), TEXT("Vector")).StartsWith(TEXT("OK")));
 	TestTrue(TEXT("add float"), UMCPEditorToolsToolset::AddEventParameter(Path, TEXT("TestEvent"), TEXT("Amount"), TEXT("float")).StartsWith(TEXT("OK")));
 
-	TestEqual(TEXT("four parameters"), Ev->UserDefinedPins.Num(), 5); // FAIL-ONCE PROOF (temporary wrong value)
+	TestEqual(TEXT("four parameters"), Ev->UserDefinedPins.Num(), 4);
 	// the compiled event must really have the pins with the right types
 	UEdGraphPin* ActorPin = Ev->FindPin(TEXT("TargetActor"));
 	UEdGraphPin* VecPin = Ev->FindPin(TEXT("Origin"));
