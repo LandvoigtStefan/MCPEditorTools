@@ -1,0 +1,24 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.1",
+	"FriendlyName": "MCPEditorTools",
+	"Description": "Small generic editor tools for Unreal's MCP toolset registry (Blueprint interfaces, pure flag, replication, comment boxes, asset delete/discard). Editor only.",
+	"Category": "Editor",
+	"CreatedBy": "",
+	"EditorOnly": true,
+	"CanContainContent": false,
+	"IsBetaVersion": true,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "MCPEditorTools",
+			"Type": "Editor",
+			"LoadingPhase": "Default",
+			"TargetAllowList": [ "Editor" ]
+		}
+	],
+	"Plugins": [
+		{ "Name": "ToolsetRegistry", "Enabled": true }
+	]
+}
