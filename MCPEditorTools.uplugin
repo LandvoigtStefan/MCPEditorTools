@@ -14,7 +14,7 @@
 		{
 			"Name": "MCPEditorTools",
 			"Type": "Editor",
-			"LoadingPhase": "Default",
+			"LoadingPhase": "PostEngineInit",
 			"TargetAllowList": [ "Editor" ]
 		}
 	],
