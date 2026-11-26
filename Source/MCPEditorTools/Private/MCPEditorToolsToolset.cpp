@@ -2,6 +2,10 @@
 #include "MCPToolUtils.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"
+#include "EdGraphNode_Comment.h"
+#include "K2Node_FunctionEntry.h"
+#include "K2Node_FunctionResult.h"
+#include "K2Node_Event.h"
 
 FString UMCPEditorToolsToolset::Ping()
 {
@@ -26,6 +30,46 @@ FString UMCPEditorToolsToolset::GetEventReplication(const FString& BlueprintPath
 	UK2Node_CustomEvent* Ev = MCPToolUtils::FindCustomEvent(BP, EventName);
 	if (!Ev) { return MCPToolUtils::Error(FString::Printf(TEXT("custom event '%s' not found in %s"), *EventName, *BlueprintPath)); }
 	return DescribeReplication(Ev->FunctionFlags);
+}
+
+FString UMCPEditorToolsToolset::FindUnconnectedNodes(const FString& BlueprintPath, const FString& GraphName, bool bDryRun)
+{
+	FString Err;
+	UBlueprint* BP = MCPToolUtils::LoadBlueprint(BlueprintPath, Err);
+	if (!BP) { return Err; }
+	UEdGraph* Graph = MCPToolUtils::FindGraph(BP, GraphName);
+	if (!Graph) { return MCPToolUtils::Error(FString::Printf(TEXT("graph '%s' not found in %s"), *GraphName, *BlueprintPath)); }
+
+	TArray<UEdGraphNode*> ToRemove;
+	TArray<FString> Lines;
+	for (UEdGraphNode* Node : Graph->Nodes)
+	{
+		if (!Node || Cast<UEdGraphNode_Comment>(Node) || Cast<UK2Node_FunctionEntry>(Node) || Cast<UK2Node_FunctionResult>(Node)) { continue; }
+		bool bAnyLink = false;
+		for (UEdGraphPin* Pin : Node->Pins)
+		{
+			if (Pin && Pin->LinkedTo.Num() > 0) { bAnyLink = true; break; }
+		}
+		if (bAnyLink) { continue; }
+		const bool bIsEvent = Cast<UK2Node_Event>(Node) != nullptr;
+		Lines.Add(FString::Printf(TEXT("%s | %s | %s | %d,%d%s"), *Node->GetName(), *Node->GetClass()->GetName(),
+			*Node->GetNodeTitle(ENodeTitleType::ListView).ToString().Replace(TEXT("\n"), TEXT(" ")), Node->NodePosX, Node->NodePosY,
+			bIsEvent ? TEXT(" [event, kept]") : TEXT("")));
+		if (!bIsEvent) { ToRemove.Add(Node); }
+	}
+
+	int32 Removed = 0;
+	if (!bDryRun && ToRemove.Num() > 0)
+	{
+		for (UEdGraphNode* Node : ToRemove)
+		{
+			FBlueprintEditorUtils::RemoveNode(BP, Node, true);
+			++Removed;
+		}
+		FBlueprintEditorUtils::MarkBlueprintAsModified(BP);
+		FKismetEditorUtilities::CompileBlueprint(BP);
+	}
+	return FString::Printf(TEXT("dry_run=%s candidates=%d removed=%d\n%s"), bDryRun ? TEXT("true") : TEXT("false"), ToRemove.Num(), Removed, *FString::Join(Lines, TEXT("\n")));
 }
 
 FString UMCPEditorToolsToolset::SetEventReplication(const FString& BlueprintPath, const FString& EventName, const FString& Mode, bool bReliable)

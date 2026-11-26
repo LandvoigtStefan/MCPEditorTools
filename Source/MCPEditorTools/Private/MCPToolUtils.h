@@ -31,6 +31,17 @@ namespace MCPToolUtils
 		BP->GetAllGraphs(Out);
 	}
 
+	inline UEdGraph* FindGraph(UBlueprint* BP, const FString& GraphName)
+	{
+		TArray<UEdGraph*> Graphs;
+		BP->GetAllGraphs(Graphs);
+		for (UEdGraph* G : Graphs)
+		{
+			if (G->GetName().Equals(GraphName, ESearchCase::IgnoreCase)) { return G; }
+		}
+		return nullptr;
+	}
+
 	/** Find a custom event node by its custom function name in all graphs of the Blueprint. */
 	inline UK2Node_CustomEvent* FindCustomEvent(UBlueprint* BP, const FString& EventName)
 	{
