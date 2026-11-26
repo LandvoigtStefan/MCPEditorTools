@@ -16,7 +16,7 @@ bool FMCPEventReplicationTest::RunTest(const FString& Parameters)
 
 	const FString R1 = UMCPEditorToolsToolset::SetEventReplication(Path, TEXT("TestEvent"), TEXT("Server"), true);
 	TestTrue(TEXT("set Server+Reliable returns OK"), R1.StartsWith(TEXT("OK")));
-	TestEqual(TEXT("Server reliable"), UMCPEditorToolsToolset::GetEventReplication(Path, TEXT("TestEvent")), FString(TEXT("mode=Server reliable=false")));
+	TestEqual(TEXT("Server reliable"), UMCPEditorToolsToolset::GetEventReplication(Path, TEXT("TestEvent")), FString(TEXT("mode=Server reliable=true")));
 
 	UMCPEditorToolsToolset::SetEventReplication(Path, TEXT("TestEvent"), TEXT("Multicast"), false);
 	TestEqual(TEXT("Multicast unreliable"), UMCPEditorToolsToolset::GetEventReplication(Path, TEXT("TestEvent")), FString(TEXT("mode=Multicast reliable=false")));
