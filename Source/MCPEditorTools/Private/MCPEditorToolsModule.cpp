@@ -1,4 +1,21 @@
 #include "Modules/ModuleManager.h"
+#include "ToolsetRegistry/UToolsetRegistry.h"
+#include "MCPEditorToolsToolset.h"
 
-// Toolsets are discovered by the ToolsetRegistry through UToolsetDefinition subclasses, so the module needs no registration code.
-IMPLEMENT_MODULE(FDefaultModuleImpl, MCPEditorTools)
+class FMCPEditorToolsModule : public IModuleInterface
+{
+	virtual void StartupModule() override
+	{
+		UToolsetRegistry::RegisterToolsetClass(UMCPEditorToolsToolset::StaticClass());
+	}
+
+	virtual void ShutdownModule() override
+	{
+		if (UObjectInitialized())
+		{
+			UToolsetRegistry::UnregisterToolsetClass(UMCPEditorToolsToolset::StaticClass());
+		}
+	}
+};
+
+IMPLEMENT_MODULE(FMCPEditorToolsModule, MCPEditorTools)
