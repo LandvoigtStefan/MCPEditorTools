@@ -124,6 +124,67 @@ FString UMCPEditorToolsToolset::FindUnconnectedNodes(const FString& BlueprintPat
 	return FString::Printf(TEXT("dry_run=%s candidates=%d removed=%d\n%s"), bDryRun ? TEXT("true") : TEXT("false"), ToRemove.Num(), Removed, *FString::Join(Lines, TEXT("\n")));
 }
 
+FString UMCPEditorToolsToolset::FindDeadNodes(const FString& BlueprintPath, const FString& GraphName, bool bDryRun)
+{
+	FString Err;
+	UBlueprint* BP = MCPToolUtils::LoadBlueprint(BlueprintPath, Err);
+	if (!BP) { return Err; }
+	TArray<UEdGraph*> Graphs;
+	if (GraphName == TEXT("*")) { BP->GetAllGraphs(Graphs); }
+	else if (UEdGraph* Found = MCPToolUtils::FindGraph(BP, GraphName)) { Graphs.Add(Found); }
+	else { return MCPToolUtils::Error(FString::Printf(TEXT("graph '%s' not found in %s"), *GraphName, *BlueprintPath)); }
+
+	TArray<FString> Lines;
+	TArray<TPair<UEdGraph*, UEdGraphNode*>> ToRemove;
+	for (UEdGraph* Graph : Graphs)
+	{
+		TSet<UEdGraphNode*> Live;
+		TArray<UEdGraphNode*> Stack;
+		auto MarkLive = [&](UEdGraphNode* N) { if (N && !Live.Contains(N)) { Live.Add(N); Stack.Add(N); } };
+		for (UEdGraphNode* Node : Graph->Nodes)
+		{
+			if (Cast<UK2Node_Event>(Node) || Cast<UK2Node_FunctionEntry>(Node) || Cast<UK2Node_FunctionResult>(Node)) { MarkLive(Node); }
+		}
+		while (Stack.Num() > 0)
+		{
+			UEdGraphNode* N = Stack.Pop();
+			for (UEdGraphPin* Pin : N->Pins)
+			{
+				if (!Pin) { continue; }
+				const bool bExec = Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Exec;
+				if (bExec && Pin->Direction == EGPD_Output)
+				{
+					for (UEdGraphPin* L : Pin->LinkedTo) { MarkLive(L->GetOwningNode()); } // execution flow forward
+				}
+				else if (!bExec && Pin->Direction == EGPD_Input)
+				{
+					for (UEdGraphPin* L : Pin->LinkedTo) { MarkLive(L->GetOwningNode()); } // data sources of a live node
+				}
+			}
+		}
+		for (UEdGraphNode* Node : Graph->Nodes)
+		{
+			if (!Node || Live.Contains(Node) || Cast<UEdGraphNode_Comment>(Node)) { continue; }
+			Lines.Add(FString::Printf(TEXT("%s | %s | %s | %s | %d,%d"), *Graph->GetName(), *Node->GetName(), *Node->GetClass()->GetName(),
+				*Node->GetNodeTitle(ENodeTitleType::ListView).ToString().Replace(TEXT("\n"), TEXT(" ")), Node->NodePosX, Node->NodePosY));
+			ToRemove.Add(TPair<UEdGraph*, UEdGraphNode*>(Graph, Node));
+		}
+	}
+
+	int32 Removed = 0;
+	if (!bDryRun && ToRemove.Num() > 0)
+	{
+		for (const TPair<UEdGraph*, UEdGraphNode*>& Pair : ToRemove)
+		{
+			FBlueprintEditorUtils::RemoveNode(BP, Pair.Value, true);
+			++Removed;
+		}
+		FBlueprintEditorUtils::MarkBlueprintAsModified(BP);
+		FKismetEditorUtilities::CompileBlueprint(BP);
+	}
+	return FString::Printf(TEXT("dry_run=%s dead=%d removed=%d\n%s"), bDryRun ? TEXT("true") : TEXT("false"), ToRemove.Num(), Removed, *FString::Join(Lines, TEXT("\n")));
+}
+
 FString UMCPEditorToolsToolset::SetEventReplication(const FString& BlueprintPath, const FString& EventName, const FString& Mode, bool bReliable)
 {
 	uint32 NewFlags = 0;

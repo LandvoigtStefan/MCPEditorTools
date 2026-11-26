@@ -53,4 +53,16 @@ public:
 	 */
 	UFUNCTION(meta = (AICallable))
 	static FString FindUnconnectedNodes(const FString& BlueprintPath, const FString& GraphName, bool bDryRun);
+
+	/**
+	 * Finds DEAD nodes: nodes that can never run or feed a running node. A node is live if it is an event, function entry or result,
+	 * is reached by execution flow from a live node, or is a data source (input pin link) of a live node. Everything else is dead,
+	 * including clusters connected to each other and unused pure nodes (e.g. leftover "bind" values). Never touches comment boxes.
+	 * @param BlueprintPath Asset path, e.g. /Game/Folder/BP_Name
+	 * @param GraphName Graph name, or "*" for ALL graphs
+	 * @param bDryRun true = only list; false = remove the dead nodes and recompile (asset not saved)
+	 * @return First line "dry_run=<bool> dead=<n> removed=<n>", then one line per node: Graph | Name | Class | Title | X,Y; or "ERROR: ..."
+	 */
+	UFUNCTION(meta = (AICallable))
+	static FString FindDeadNodes(const FString& BlueprintPath, const FString& GraphName, bool bDryRun);
 };
