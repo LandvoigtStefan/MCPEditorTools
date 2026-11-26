@@ -48,12 +48,13 @@ bool FMCPFindUnconnectedNodesTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("lonely event still there"), MCPToolUtils::FindCustomEvent(BP, TEXT("Lonely")) != nullptr);
 
 	const FString All = UMCPEditorToolsToolset::FindUnconnectedNodes(Path, TEXT("*"), true);
-	TestTrue(TEXT("'*' scans all graphs (0 removable left, lonely event listed with graph name)"), All.StartsWith(TEXT("dry_run=true candidates=7 removed=0")) && All.Contains(Graph->GetName() + TEXT(" | ")));
+	TestTrue(TEXT("'*' scans all graphs (0 removable left, lonely event listed with graph name)"), All.StartsWith(TEXT("dry_run=true candidates=0 removed=0")) && All.Contains(Graph->GetName() + TEXT(" | ")));
 	TestTrue(TEXT("unknown graph is an error"), UMCPEditorToolsToolset::FindUnconnectedNodes(Path, TEXT("NoSuchGraph"), true).StartsWith(TEXT("ERROR")));
 
 	MCPTestUtils::Cleanup(BP);
 	AddInfo(TEXT("PASS all checks passed"));
 	return true;
 }
+
 
 
