@@ -39,9 +39,9 @@ public:
 	 * Finds nodes that have NO connection at all (no linked pin) in one graph of a Blueprint, and optionally removes them.
 	 * Never touches comment boxes, function entry/result nodes or event nodes (events are only listed as "[event, kept]").
 	 * @param BlueprintPath Asset path, e.g. /Game/Folder/BP_Name
-	 * @param GraphName Name of the graph, e.g. EventGraph or a function name
+	 * @param GraphName Name of the graph, e.g. EventGraph or a function name, or "*" for ALL graphs of the Blueprint
 	 * @param bDryRun true = only list (default behaviour you should use first); false = remove the listed nodes, recompile (asset not saved)
-	 * @return First line "dry_run=<bool> candidates=<n> removed=<n>", then one line per node: Name | Class | Title | X,Y; or "ERROR: ..."
+	 * @return First line "dry_run=<bool> candidates=<n> removed=<n>", then one line per node: Graph | Name | Class | Title | X,Y; or "ERROR: ..."
 	 */
 	UFUNCTION(meta = (AICallable))
 	static FString FindUnconnectedNodes(const FString& BlueprintPath, const FString& GraphName, bool bDryRun);

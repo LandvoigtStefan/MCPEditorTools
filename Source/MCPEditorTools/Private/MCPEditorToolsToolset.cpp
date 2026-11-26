@@ -37,11 +37,23 @@ FString UMCPEditorToolsToolset::FindUnconnectedNodes(const FString& BlueprintPat
 	FString Err;
 	UBlueprint* BP = MCPToolUtils::LoadBlueprint(BlueprintPath, Err);
 	if (!BP) { return Err; }
-	UEdGraph* Graph = MCPToolUtils::FindGraph(BP, GraphName);
-	if (!Graph) { return MCPToolUtils::Error(FString::Printf(TEXT("graph '%s' not found in %s"), *GraphName, *BlueprintPath)); }
+	TArray<UEdGraph*> Graphs;
+	if (GraphName == TEXT("*"))
+	{
+		BP->GetAllGraphs(Graphs);
+	}
+	else if (UEdGraph* Found = MCPToolUtils::FindGraph(BP, GraphName))
+	{
+		Graphs.Add(Found);
+	}
+	else
+	{
+		return MCPToolUtils::Error(FString::Printf(TEXT("graph '%s' not found in %s"), *GraphName, *BlueprintPath));
+	}
 
 	TArray<UEdGraphNode*> ToRemove;
 	TArray<FString> Lines;
+	for (UEdGraph* Graph : Graphs)
 	for (UEdGraphNode* Node : Graph->Nodes)
 	{
 		if (!Node || Cast<UEdGraphNode_Comment>(Node) || Cast<UK2Node_FunctionEntry>(Node) || Cast<UK2Node_FunctionResult>(Node)) { continue; }
@@ -52,7 +64,7 @@ FString UMCPEditorToolsToolset::FindUnconnectedNodes(const FString& BlueprintPat
 		}
 		if (bAnyLink) { continue; }
 		const bool bIsEvent = Cast<UK2Node_Event>(Node) != nullptr;
-		Lines.Add(FString::Printf(TEXT("%s | %s | %s | %d,%d%s"), *Node->GetName(), *Node->GetClass()->GetName(),
+		Lines.Add(FString::Printf(TEXT("%s | %s | %s | %s | %d,%d%s"), *Graph->GetName(), *Node->GetName(), *Node->GetClass()->GetName(),
 			*Node->GetNodeTitle(ENodeTitleType::ListView).ToString().Replace(TEXT("\n"), TEXT(" ")), Node->NodePosX, Node->NodePosY,
 			bIsEvent ? TEXT(" [event, kept]") : TEXT("")));
 		if (!bIsEvent) { ToRemove.Add(Node); }
