@@ -250,3 +250,106 @@ FString UMCPEditorToolsToolset::SetEventReplication(const FString& BlueprintPath
 	return FString::Printf(TEXT("OK %s (asset not saved)"), *DescribeReplication(Ev->FunctionFlags));
 }
 
+static UEdGraphNode* FindNodeByName(UEdGraph* Graph, const FString& NodeName)
+{
+	for (UEdGraphNode* Node : Graph->Nodes)
+	{
+		if (Node && Node->GetName().Equals(NodeName, ESearchCase::IgnoreCase)) { return Node; }
+	}
+	return nullptr;
+}
+
+static UEdGraphPin* FindPinByName(UEdGraphNode* Node, const FString& PinName, EEdGraphPinDirection Dir)
+{
+	for (UEdGraphPin* Pin : Node->Pins)
+	{
+		if (Pin->Direction == Dir && !Pin->bHidden && Pin->PinName.ToString().Equals(PinName, ESearchCase::IgnoreCase)) { return Pin; }
+	}
+	return nullptr;
+}
+
+static FString ListPins(UEdGraphNode* Node, EEdGraphPinDirection Dir)
+{
+	TArray<FString> Names;
+	for (UEdGraphPin* Pin : Node->Pins)
+	{
+		if (Pin->Direction == Dir && !Pin->bHidden) { Names.Add(Pin->PinName.ToString()); }
+	}
+	return FString::Join(Names, TEXT(", "));
+}
+
+FString UMCPEditorToolsToolset::ConnectPins(const FString& BlueprintPath, const FString& GraphName, const FString& FromNode, const FString& FromPin, const FString& ToNode, const FString& ToPin)
+{
+	FString Err;
+	UBlueprint* BP = MCPToolUtils::LoadBlueprint(BlueprintPath, Err);
+	if (!BP) { return Err; }
+	UEdGraph* Graph = MCPToolUtils::FindGraph(BP, GraphName);
+	if (!Graph) { return MCPToolUtils::Error(FString::Printf(TEXT("graph '%s' not found in %s"), *GraphName, *BlueprintPath)); }
+
+	UEdGraphNode* A = FindNodeByName(Graph, FromNode);
+	if (!A) { return MCPToolUtils::Error(FString::Printf(TEXT("node '%s' not found in graph %s"), *FromNode, *GraphName)); }
+	UEdGraphNode* B = FindNodeByName(Graph, ToNode);
+	if (!B) { return MCPToolUtils::Error(FString::Printf(TEXT("node '%s' not found in graph %s"), *ToNode, *GraphName)); }
+	UEdGraphPin* PinA = FindPinByName(A, FromPin, EGPD_Output);
+	if (!PinA) { return MCPToolUtils::Error(FString::Printf(TEXT("output pin '%s' not found on %s. Output pins: %s"), *FromPin, *FromNode, *ListPins(A, EGPD_Output))); }
+	UEdGraphPin* PinB = FindPinByName(B, ToPin, EGPD_Input);
+	if (!PinB) { return MCPToolUtils::Error(FString::Printf(TEXT("input pin '%s' not found on %s. Input pins: %s"), *ToPin, *ToNode, *ListPins(B, EGPD_Input))); }
+
+	const UEdGraphSchema* Schema = Graph->GetSchema();
+	const FPinConnectionResponse Response = Schema->CanCreateConnection(PinA, PinB);
+	if (Response.Response == CONNECT_RESPONSE_DISALLOW)
+	{
+		return MCPToolUtils::Error(FString::Printf(TEXT("schema refuses %s.%s -> %s.%s: %s"), *FromNode, *FromPin, *ToNode, *ToPin, *Response.Message.ToString()));
+	}
+	if (!Schema->TryCreateConnection(PinA, PinB))
+	{
+		return MCPToolUtils::Error(FString::Printf(TEXT("connection %s.%s -> %s.%s could not be created"), *FromNode, *FromPin, *ToNode, *ToPin));
+	}
+	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);
+	return FString::Printf(TEXT("OK connected %s.%s -> %s.%s (asset not saved)"), *FromNode, *FromPin, *ToNode, *ToPin);
+}
+
+FString UMCPEditorToolsToolset::SetFunctionPure(const FString& BlueprintPath, const FString& FunctionName, bool bPure)
+{
+	FString Err;
+	UBlueprint* BP = MCPToolUtils::LoadBlueprint(BlueprintPath, Err);
+	if (!BP) { return Err; }
+	UEdGraph* Graph = nullptr;
+	for (UEdGraph* G : BP->FunctionGraphs)
+	{
+		if (G && G->GetName().Equals(FunctionName, ESearchCase::IgnoreCase)) { Graph = G; break; }
+	}
+	if (!Graph) { return MCPToolUtils::Error(FString::Printf(TEXT("function '%s' not found in %s"), *FunctionName, *BlueprintPath)); }
+
+	UK2Node_FunctionEntry* Entry = nullptr;
+	for (UEdGraphNode* Node : Graph->Nodes)
+	{
+		Entry = Cast<UK2Node_FunctionEntry>(Node);
+		if (Entry) { break; }
+	}
+	if (!Entry) { return MCPToolUtils::Error(TEXT("function has no entry node")); }
+
+	if (bPure)
+	{
+		if (UEdGraphPin* Then = Entry->FindPin(UEdGraphSchema_K2::PN_Then))
+		{
+			if (Then->LinkedTo.Num() > 0)
+			{
+				return MCPToolUtils::Error(TEXT("function still has execution flow (entry 'then' is linked). A pure function can only have data nodes: rewire first"));
+			}
+		}
+		Entry->Modify();
+		Entry->AddExtraFlags(FUNC_BlueprintPure | FUNC_BlueprintCallable);
+	}
+	else
+	{
+		Entry->Modify();
+		Entry->ClearExtraFlags(FUNC_BlueprintPure);
+		Entry->AddExtraFlags(FUNC_BlueprintCallable);
+	}
+	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);
+	FKismetEditorUtilities::CompileBlueprint(BP);
+	const bool bNow = Entry->HasAnyExtraFlags(FUNC_BlueprintPure);
+	return FString::Printf(TEXT("OK pure=%s (asset not saved)"), bNow ? TEXT("true") : TEXT("false"));
+}
+

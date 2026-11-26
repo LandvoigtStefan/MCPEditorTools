@@ -76,4 +76,30 @@ public:
 	 */
 	UFUNCTION(meta = (AICallable))
 	static FString FindDeadNodes(const FString& BlueprintPath, const FString& GraphName, bool bDryRun);
+
+	/**
+	 * Connects an OUTPUT pin of one node to an INPUT pin of another node in one graph. Fails loudly: unknown graph, node or pin
+	 * (the error lists the available pins), or a connection the Blueprint schema refuses (the error contains the schema's reason).
+	 * Does not break existing links unless the schema itself replaces them (e.g. a second link into a single-input data pin).
+	 * @param BlueprintPath Asset path, e.g. /Game/Folder/BP_Name
+	 * @param GraphName Graph name (EventGraph or a function name)
+	 * @param FromNode Node name as printed by FindUnconnectedNodes / FindDeadNodes (e.g. K2Node_CallFunction_12)
+	 * @param FromPin Name of the OUTPUT pin on FromNode (e.g. then, ReturnValue)
+	 * @param ToNode Node name of the target node
+	 * @param ToPin Name of the INPUT pin on ToNode (e.g. execute, InString)
+	 * @return "OK connected A.pin -> B.pin (asset not saved)" or "ERROR: ..."
+	 */
+	UFUNCTION(meta = (AICallable))
+	static FString ConnectPins(const FString& BlueprintPath, const FString& GraphName, const FString& FromNode, const FString& FromPin, const FString& ToNode, const FString& ToPin);
+
+	/**
+	 * Sets a Blueprint function "Pure" (no exec pins, only data) or back to impure. Refuses and reports if the function body still
+	 * has an execution flow that a pure function cannot have (entry's exec output linked) when setting Pure.
+	 * @param BlueprintPath Asset path, e.g. /Game/Folder/BP_Name
+	 * @param FunctionName Name of the function graph
+	 * @param bPure true = make pure, false = make impure
+	 * @return "OK pure=<bool> (asset not saved)" or "ERROR: ..."
+	 */
+	UFUNCTION(meta = (AICallable))
+	static FString SetFunctionPure(const FString& BlueprintPath, const FString& FunctionName, bool bPure);
 };
