@@ -68,7 +68,14 @@ bool FMCPInterfaceFunctionTest::RunTest(const FString& Parameters)
 	// implementing side: the new functions become graphs in the implementer
 	const FString C = UMCPEditorToolsToolset::ConformInterfaces(BPPath);
 	TestTrue(*FString::Printf(TEXT("conform OK (got: %s)"), *C), C.StartsWith(TEXT("OK")));
-	auto HasGraph = [&](const TCHAR* Name) { return Impl->FunctionGraphs.ContainsByPredicate([Name](UEdGraph* G) { return G && G->GetFName() == Name; }); };
+	auto HasGraph = [&](const TCHAR* Name)
+	{
+		for (const FBPInterfaceDescription& Desc : Impl->ImplementedInterfaces)
+		{
+			if (Desc.Graphs.ContainsByPredicate([Name](UEdGraph* G) { return G && G->GetFName() == Name; })) { return true; }
+		}
+		return false;
+	};
 	TestTrue(TEXT("implementer got GetGripTransform"), HasGraph(TEXT("GetGripTransform")));
 	TestTrue(TEXT("implementer got GetGripKind"), HasGraph(TEXT("GetGripKind")));
 	TestTrue(TEXT("second conform adds nothing"), UMCPEditorToolsToolset::ConformInterfaces(BPPath).Contains(TEXT("new function graphs: []")));

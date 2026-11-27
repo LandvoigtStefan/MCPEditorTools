@@ -483,11 +483,12 @@ FString UMCPEditorToolsToolset::ConformInterfaces(const FString& BlueprintPath)
 	FString Err;
 	UBlueprint* BP = MCPToolUtils::LoadBlueprint(BlueprintPath, Err);
 	if (!BP) { return Err; }
+	// graphs that implement interface functions live inside ImplementedInterfaces[].Graphs, not in FunctionGraphs
 	TSet<FName> Before;
-	for (UEdGraph* G : BP->FunctionGraphs) { if (G) { Before.Add(G->GetFName()); } }
+	for (const FBPInterfaceDescription& Desc : BP->ImplementedInterfaces) { for (UEdGraph* G : Desc.Graphs) { if (G) { Before.Add(G->GetFName()); } } }
 	FBlueprintEditorUtils::ConformImplementedInterfaces(BP);
 	TArray<FString> Added;
-	for (UEdGraph* G : BP->FunctionGraphs) { if (G && !Before.Contains(G->GetFName())) { Added.Add(G->GetFName().ToString()); } }
+	for (const FBPInterfaceDescription& Desc : BP->ImplementedInterfaces) { for (UEdGraph* G : Desc.Graphs) { if (G && !Before.Contains(G->GetFName())) { Added.Add(G->GetFName().ToString()); } } }
 	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);
 	FKismetEditorUtilities::CompileBlueprint(BP);
 	return FString::Printf(TEXT("OK new function graphs: [%s]; interfaces: %d (asset not saved). Interface functions WITHOUT outputs become events: add those by hand."), *FString::Join(Added, TEXT(", ")), BP->ImplementedInterfaces.Num());
