@@ -145,4 +145,14 @@ public:
 	 */
 	UFUNCTION(meta = (AICallable))
 	static FString AddInterfaceToBlueprint(const FString& BlueprintPath, const FString& InterfacePath);
+	/**
+	 * Removes a Blueprint Interface that a Blueprint implements DIRECTLY (Class Settings > Implemented Interfaces > Remove) together with the function graphs
+	 * of that interface. Use it on a child component/actor whose parent already implements the interface (the parent's implementation then applies).
+	 * An interface that is only inherited from the parent cannot be removed here ("OK not implemented directly"). Recompiles; does NOT save.
+	 * @param BlueprintPath Asset path of the Blueprint
+	 * @param InterfacePath Asset path of the Blueprint Interface
+	 * @return "OK ..." or "ERROR: ..."
+	 */
+	UFUNCTION(meta = (AICallable))
+	static FString RemoveInterfaceFromBlueprint(const FString& BlueprintPath, const FString& InterfacePath);
 };

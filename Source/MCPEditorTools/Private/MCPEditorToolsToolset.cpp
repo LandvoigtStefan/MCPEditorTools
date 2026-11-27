@@ -514,3 +514,24 @@ FString UMCPEditorToolsToolset::AddInterfaceToBlueprint(const FString& Blueprint
 	FKismetEditorUtilities::CompileBlueprint(BP);
 	return FString::Printf(TEXT("OK added the interface; implemented interfaces now: %d (asset not saved). Interface functions WITHOUT outputs become events: add those by hand."), BP->ImplementedInterfaces.Num());
 }
+
+FString UMCPEditorToolsToolset::RemoveInterfaceFromBlueprint(const FString& BlueprintPath, const FString& InterfacePath)
+{
+	FString Err;
+	UBlueprint* BP = MCPToolUtils::LoadBlueprint(BlueprintPath, Err);
+	if (!BP) { return Err; }
+	UBlueprint* Iface = MCPToolUtils::LoadBlueprint(InterfacePath, Err);
+	if (!Iface) { return Err; }
+	if (Iface->BlueprintType != BPTYPE_Interface) { return TEXT("ERROR: ") + InterfacePath + TEXT(" is not a Blueprint Interface"); }
+	if (!Iface->GeneratedClass) { return TEXT("ERROR: the interface has no generated class (compile it first)"); }
+	bool bFound = false;
+	for (const FBPInterfaceDescription& Desc : BP->ImplementedInterfaces)
+	{
+		if (Desc.Interface == Iface->GeneratedClass) { bFound = true; break; }
+	}
+	if (!bFound) { return TEXT("OK not implemented directly by this Blueprint (nothing changes; an interface inherited from a parent stays)"); }
+	FBlueprintEditorUtils::RemoveInterface(BP, Iface->GeneratedClass->GetClassPathName(), false);
+	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);
+	FKismetEditorUtilities::CompileBlueprint(BP);
+	return FString::Printf(TEXT("OK removed the interface and its function graphs; implemented interfaces now: %d (asset not saved)"), BP->ImplementedInterfaces.Num());
+}
