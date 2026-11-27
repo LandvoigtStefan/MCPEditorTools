@@ -134,4 +134,15 @@ public:
 	 */
 	UFUNCTION(meta = (AICallable))
 	static FString ConformInterfaces(const FString& BlueprintPath);
+
+	/**
+	 * Makes a Blueprint implement a Blueprint Interface (the "Class Settings > Implemented Interfaces > Add" step). Creates the function graphs for interface
+	 * functions that have outputs (functions without outputs become events: add those by hand or in DSL as `(event EventName ...)`). Recompiles; does NOT save.
+	 * Already implemented = "OK already implemented" (nothing changes).
+	 * @param BlueprintPath Asset path of the implementing Blueprint (actor, component, ...)
+	 * @param InterfacePath Asset path of the Blueprint Interface
+	 * @return "OK ..." or "ERROR: ..."
+	 */
+	UFUNCTION(meta = (AICallable))
+	static FString AddInterfaceToBlueprint(const FString& BlueprintPath, const FString& InterfacePath);
 };
