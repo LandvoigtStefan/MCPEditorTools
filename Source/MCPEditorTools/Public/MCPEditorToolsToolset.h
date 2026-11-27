@@ -114,4 +114,24 @@ public:
 	 */
 	UFUNCTION(meta = (AICallable))
 	static FString AddEventParameter(const FString& BlueprintPath, const FString& EventName, const FString& ParamName, const FString& TypeName);
+
+	/**
+	 * Adds a function to a Blueprint Interface (no editor UI needed). Recompiles; does NOT save the asset.
+	 * @param InterfacePath Asset path of the Blueprint Interface, e.g. /Game/DoN/Blueprints/Interfaces/BPI_Interactable
+	 * @param FunctionName New function name (must not exist yet)
+	 * @param Inputs "Name:Type;Name:Type" or empty. Types: bool, int, float, byte, string, name, text, Vector, Rotator, Transform, or a class / struct / enum path
+	 * @param Outputs same format as Inputs (outputs make it a function; without outputs implementers get an event instead)
+	 * @return "OK added ..." or "ERROR: ..."
+	 */
+	UFUNCTION(meta = (AICallable))
+	static FString AddInterfaceFunction(const FString& InterfacePath, const FString& FunctionName, const FString& Inputs, const FString& Outputs);
+
+	/**
+	 * Makes a Blueprint implement every function of the interfaces it already implements: creates the missing function graphs
+	 * (use after AddInterfaceFunction). Recompiles; does NOT save the asset.
+	 * @param BlueprintPath Asset path of the implementing Blueprint
+	 * @return "OK new function graphs: [...]" or "ERROR: ..."
+	 */
+	UFUNCTION(meta = (AICallable))
+	static FString ConformInterfaces(const FString& BlueprintPath);
 };

@@ -252,10 +252,9 @@ FString UMCPEditorToolsToolset::SetEventReplication(const FString& BlueprintPath
 	return FString::Printf(TEXT("OK %s (asset not saved)"), *DescribeReplication(Ev->FunctionFlags));
 }
 
-FString UMCPEditorToolsToolset::AddEventParameter(const FString& BlueprintPath, const FString& EventName, const FString& ParamName, const FString& TypeName)
+/** Turns a type word into a pin type. Words: bool, int, float, byte, string, name, text, Vector, Rotator, Transform; a path starting with "/" is an object class, a struct (/Script/CoreUObject.LinearColor) or an enum (/Game/.../E_Name). On failure returns an "ERROR: ..." string, on success an empty string. */
+static FString ParsePinType(const FString& TypeName, FEdGraphPinType& PinType)
 {
-	if (ParamName.IsEmpty()) { return MCPToolUtils::Error(TEXT("ParamName is empty")); }
-	FEdGraphPinType PinType;
 	if (TypeName.Equals(TEXT("bool"), ESearchCase::IgnoreCase)) { PinType.PinCategory = UEdGraphSchema_K2::PC_Boolean; }
 	else if (TypeName.Equals(TEXT("int"), ESearchCase::IgnoreCase)) { PinType.PinCategory = UEdGraphSchema_K2::PC_Int; }
 	else if (TypeName.Equals(TEXT("float"), ESearchCase::IgnoreCase)) { PinType.PinCategory = UEdGraphSchema_K2::PC_Real; PinType.PinSubCategory = UEdGraphSchema_K2::PC_Double; }
@@ -265,17 +264,42 @@ FString UMCPEditorToolsToolset::AddEventParameter(const FString& BlueprintPath, 
 	else if (TypeName.Equals(TEXT("text"), ESearchCase::IgnoreCase)) { PinType.PinCategory = UEdGraphSchema_K2::PC_Text; }
 	else if (TypeName.Equals(TEXT("Vector"), ESearchCase::IgnoreCase)) { PinType.PinCategory = UEdGraphSchema_K2::PC_Struct; PinType.PinSubCategoryObject = TBaseStructure<FVector>::Get(); }
 	else if (TypeName.Equals(TEXT("Rotator"), ESearchCase::IgnoreCase)) { PinType.PinCategory = UEdGraphSchema_K2::PC_Struct; PinType.PinSubCategoryObject = TBaseStructure<FRotator>::Get(); }
+	else if (TypeName.Equals(TEXT("Transform"), ESearchCase::IgnoreCase)) { PinType.PinCategory = UEdGraphSchema_K2::PC_Struct; PinType.PinSubCategoryObject = TBaseStructure<FTransform>::Get(); }
 	else if (TypeName.StartsWith(TEXT("/")))
 	{
-		UClass* Class = LoadObject<UClass>(nullptr, *TypeName);
-		if (!Class) { return MCPToolUtils::Error(FString::Printf(TEXT("class '%s' not found"), *TypeName)); }
-		PinType.PinCategory = UEdGraphSchema_K2::PC_Object;
-		PinType.PinSubCategoryObject = Class;
+		if (UClass* Class = LoadObject<UClass>(nullptr, *TypeName))
+		{
+			PinType.PinCategory = UEdGraphSchema_K2::PC_Object;
+			PinType.PinSubCategoryObject = Class;
+		}
+		else if (UScriptStruct* Struct = LoadObject<UScriptStruct>(nullptr, *TypeName))
+		{
+			PinType.PinCategory = UEdGraphSchema_K2::PC_Struct;
+			PinType.PinSubCategoryObject = Struct;
+		}
+		else if (UEnum* Enum = LoadObject<UEnum>(nullptr, *TypeName))
+		{
+			PinType.PinCategory = UEdGraphSchema_K2::PC_Byte;
+			PinType.PinSubCategoryObject = Enum;
+		}
+		else
+		{
+			return MCPToolUtils::Error(FString::Printf(TEXT("class, struct or enum '%s' not found"), *TypeName));
+		}
 	}
 	else
 	{
-		return MCPToolUtils::Error(FString::Printf(TEXT("unknown type '%s' (use bool, int, float, byte, string, name, text, Vector, Rotator or a class path)"), *TypeName));
+		return MCPToolUtils::Error(FString::Printf(TEXT("unknown type '%s' (use bool, int, float, byte, string, name, text, Vector, Rotator, Transform or a class/struct/enum path)"), *TypeName));
 	}
+	return FString();
+}
+
+FString UMCPEditorToolsToolset::AddEventParameter(const FString& BlueprintPath, const FString& EventName, const FString& ParamName, const FString& TypeName)
+{
+	if (ParamName.IsEmpty()) { return MCPToolUtils::Error(TEXT("ParamName is empty")); }
+	FEdGraphPinType PinType;
+	const FString TypeError = ParsePinType(TypeName, PinType);
+	if (!TypeError.IsEmpty()) { return TypeError; }
 
 	FString Err;
 	UBlueprint* BP = MCPToolUtils::LoadBlueprint(BlueprintPath, Err);
@@ -392,5 +416,80 @@ FString UMCPEditorToolsToolset::SetFunctionPure(const FString& BlueprintPath, co
 	FKismetEditorUtilities::CompileBlueprint(BP);
 	const bool bNow = Entry->HasAnyExtraFlags(FUNC_BlueprintPure);
 	return FString::Printf(TEXT("OK pure=%s (asset not saved)"), bNow ? TEXT("true") : TEXT("false"));
+}
+
+/** Parses "Name:Type;Name:Type" into pins. Returns an "ERROR: ..." string on failure, empty on success. */
+static FString ParseParamList(const FString& Spec, TArray<TPair<FName, FEdGraphPinType>>& Out)
+{
+	TArray<FString> Items;
+	Spec.ParseIntoArray(Items, TEXT(";"), true);
+	for (FString Item : Items)
+	{
+		Item.TrimStartAndEndInline();
+		FString Name, Type;
+		if (!Item.Split(TEXT(":"), &Name, &Type)) { return MCPToolUtils::Error(FString::Printf(TEXT("'%s' is not Name:Type"), *Item)); }
+		Name.TrimStartAndEndInline();
+		Type.TrimStartAndEndInline();
+		if (Name.IsEmpty()) { return MCPToolUtils::Error(FString::Printf(TEXT("empty parameter name in '%s'"), *Item)); }
+		FEdGraphPinType PinType;
+		const FString TypeError = ParsePinType(Type, PinType);
+		if (!TypeError.IsEmpty()) { return TypeError; }
+		Out.Add(TPair<FName, FEdGraphPinType>(FName(*Name), PinType));
+	}
+	return FString();
+}
+
+FString UMCPEditorToolsToolset::AddInterfaceFunction(const FString& InterfacePath, const FString& FunctionName, const FString& Inputs, const FString& Outputs)
+{
+	if (FunctionName.IsEmpty()) { return MCPToolUtils::Error(TEXT("FunctionName is empty")); }
+	TArray<TPair<FName, FEdGraphPinType>> InPins, OutPins;
+	FString ParseError = ParseParamList(Inputs, InPins);
+	if (!ParseError.IsEmpty()) { return ParseError; }
+	ParseError = ParseParamList(Outputs, OutPins);
+	if (!ParseError.IsEmpty()) { return ParseError; }
+
+	FString Err;
+	UBlueprint* BP = MCPToolUtils::LoadBlueprint(InterfacePath, Err);
+	if (!BP) { return Err; }
+	if (BP->BlueprintType != BPTYPE_Interface) { return MCPToolUtils::Error(FString::Printf(TEXT("%s is not a Blueprint Interface"), *InterfacePath)); }
+	for (UEdGraph* Existing : BP->FunctionGraphs)
+	{
+		if (Existing && Existing->GetFName().ToString().Equals(FunctionName, ESearchCase::IgnoreCase)) { return MCPToolUtils::Error(FString::Printf(TEXT("%s already has a function '%s'"), *InterfacePath, *FunctionName)); }
+	}
+
+	UEdGraph* Graph = FBlueprintEditorUtils::CreateNewGraph(BP, FName(*FunctionName), UEdGraph::StaticClass(), UEdGraphSchema_K2::StaticClass());
+	FBlueprintEditorUtils::AddFunctionGraph<UClass>(BP, Graph, true, nullptr);
+	UK2Node_FunctionEntry* Entry = nullptr;
+	for (UEdGraphNode* Node : Graph->Nodes)
+	{
+		Entry = Cast<UK2Node_FunctionEntry>(Node);
+		if (Entry) { break; }
+	}
+	if (!Entry) { return MCPToolUtils::Error(TEXT("function entry node was not created")); }
+
+	for (const TPair<FName, FEdGraphPinType>& P : InPins) { Entry->CreateUserDefinedPin(P.Key, P.Value, EGPD_Output, false); }
+	if (OutPins.Num() > 0)
+	{
+		UK2Node_FunctionResult* Result = FBlueprintEditorUtils::FindOrCreateFunctionResultNode(Entry);
+		for (const TPair<FName, FEdGraphPinType>& P : OutPins) { Result->CreateUserDefinedPin(P.Key, P.Value, EGPD_Input, false); }
+	}
+	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);
+	FKismetEditorUtilities::CompileBlueprint(BP);
+	return FString::Printf(TEXT("OK added %s (%d inputs, %d outputs) (asset not saved; run ConformInterfaces on every Blueprint that implements this interface)"), *FunctionName, InPins.Num(), OutPins.Num());
+}
+
+FString UMCPEditorToolsToolset::ConformInterfaces(const FString& BlueprintPath)
+{
+	FString Err;
+	UBlueprint* BP = MCPToolUtils::LoadBlueprint(BlueprintPath, Err);
+	if (!BP) { return Err; }
+	TSet<FName> Before;
+	for (UEdGraph* G : BP->FunctionGraphs) { if (G) { Before.Add(G->GetFName()); } }
+	FBlueprintEditorUtils::ConformImplementedInterfaces(BP);
+	TArray<FString> Added;
+	for (UEdGraph* G : BP->FunctionGraphs) { if (G && !Before.Contains(G->GetFName())) { Added.Add(G->GetFName().ToString()); } }
+	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);
+	FKismetEditorUtilities::CompileBlueprint(BP);
+	return FString::Printf(TEXT("OK new function graphs: [%s]; interfaces: %d (asset not saved). Interface functions WITHOUT outputs become events: add those by hand."), *FString::Join(Added, TEXT(", ")), BP->ImplementedInterfaces.Num());
 }
 
